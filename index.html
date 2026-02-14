@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Para mi Cotufita</title>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Montserrat:wght@300&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at center, #1a0b2e 0%, #000000 100%);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #contenedor {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        #texto-contenedor {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            text-align: center;
+            pointer-events: none;
+            mix-blend-mode: screen;
+            width: 100%;
+        }
+
+        h1 {
+            font-family: 'Dancing Script', cursive;
+            font-size: 4rem;
+            margin: 0;
+            opacity: 0;
+            animation: aparecer 2s ease-out forwards;
+            animation-delay: 1s;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8),
+                         0 0 20px rgba(100, 200, 255, 0.4);
+        }
+
+        p {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.5rem;
+            margin-top: 10px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: aparecer 2s ease-out forwards;
+            animation-delay: 2s;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        #aviso-musica {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.8rem;
+            pointer-events: none;
+            animation: parpadeo 2s infinite;
+        }
+
+        @keyframes aparecer {
+            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: translateY(20px); }
+        }
+
+        @keyframes parpadeo {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="musica" loop>
+        <source src="cancion.mp3" type="audio/mpeg">
+    </audio>
+
+    <div id="contenedor">
+        <canvas id="lienzo"></canvas>
+        <div id="texto-contenedor">
+            <h1>Feliz San Valentín mi Cotufita</h1>
+            <p>Te quiero 3000</p>
+        </div>
+        <div id="aviso-musica">Haz clic en la pantalla para ver nuestros recuerdos 🎵</div>
+    </div>
+
+    <script>
+        // --- CHIVATO DE ERRORES (Te avisará si algo falla) ---
+        window.onerror = function(msg, url, line) {
+            alert("¡Ups! Hay un error en el código:\n" + msg + "\nEn la línea: " + line + "\nRevisa las comas y comillas.");
+        };
+
+        const canvas = document.getElementById('lienzo');
+        const ctx = canvas.getContext('2d');
+        const audio = document.getElementById('musica');
+        const aviso = document.getElementById('aviso-musica');
+
+        let width, height;
+        
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- SISTEMA DE CARGA ---
+        const bancoContenido = [];      
+        let bolsaDisponible = [];       
+
+        // 1. CARGAR FOTOS
+        // ¡CUIDADO AQUÍ! Asegúrate de que cada nombre esté entre comillas '...' 
+        // y separado por una coma ,
+        const listaFotos = [
+            'foto1.jpeg',    
+            'foto2.jpeg', 
+            'foto3.jpeg',
+            'foto4.jpeg'
+        ];
+
+        listaFotos.forEach(nombre => {
+            const img = new Image();
+            img.src = nombre;
+            img.onload = () => bancoContenido.push({ tipo: 'img', elemento: img });
+            // Si la imagen falla, no bloqueamos el resto
+            img.onerror = () => console.log("No se encontró la imagen: " + nombre);
+        });
+
+        // 2. CARGAR VIDEO
+        const video = document.createElement('video');
+        video.src = 'video.mp4'; 
+        video.muted = true;      
+        video.loop = true;       
+        video.playsInline = true; 
+        
+        // Intentamos cargar el video
+        video.oncanplay = () => {
+            video.play().catch(e => console.log("Error reproduciendo video oculto"));
+            bancoContenido.push({ tipo: 'video', elemento: video });
+        };
+        video.onerror = () => console.log("No se encontró el video o formato incorrecto");
+
+        function obtenerContenidoSinRepetir() {
+            if (bancoContenido.length === 0) return null;
+            if (bolsaDisponible.length === 0) {
+                bolsaDisponible = [...bancoContenido];
+            }
+            const indiceAleatorio = Math.floor(Math.random() * bolsaDisponible.length);
+            return bolsaDisponible.splice(indiceAleatorio, 1)[0];
+        }
+
+        const colores = [
+            { r: 0, g: 255, b: 255 },    // Cian
+            { r: 46, g: 134, b: 222 },   // Azul
+            { r: 205, g: 132, b: 241 },  // Lila
+            { r: 100, g: 0, b: 255 }     // Violeta
+        ];
+
+        class Chispa {
+            constructor() { this.reiniciar(); }
+            reiniciar() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.size = Math.random() * 2;
+                this.speedX = Math.random() * 1 - 0.5;
+                this.speedY = Math.random() * 1 - 0.5;
+                this.alpha = Math.random();
+            }
+            update() {
+                this.x += this.speedX; this.y += this.speedY;
+                if (this.alpha > 0) this.alpha -= 0.005;
+                if (this.alpha <= 0) this.reiniciar();
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class RosaOrganica {
+            constructor(x, y, colorBase, isInteractive = false) {
+                this.x = x; this.y = y; this.color = colorBase; this.petalos = [];
+                const capas = 4;
+                for (let i = 0; i < capas; i++) {
+                    const numPetalos = 3 + i * 2;
+                    for (let j = 0; j < numPetalos; j++) {
+                        const angle = (Math.PI * 2 / numPetalos) * j + (i % 2 * Math.PI/numPetalos);
+                        const size = 15 + i * 15;
+                        this.petalos.push({
+                            angle: angle, targetSize: size, currentSize: 0,
+                            delay: isInteractive ? 0 : i * 5 + Math.random() * 5,
+                            growSpeed: isInteractive ? 4.0 : 2.0 + Math.random() * 2.0,
+                            colorOffset: Math.random() * 40 - 20
+                        });
+                    }
+                }
+            }
+            draw() {
+                this.petalos.forEach(p => {
+                    if (p.delay > 0) { p.delay--; return; }
+                    if (p.currentSize < p.targetSize) {
+                        p.currentSize += p.growSpeed;
+                        if(p.currentSize > p.targetSize) p.currentSize = p.targetSize;
+                    }
+                    ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(p.angle);
+                    ctx.beginPath();
+                    let grad = ctx.createRadialGradient(0, -p.currentSize, 0, 0, -p.currentSize, p.currentSize * 2);
+                    const r = Math.max(0, Math.min(255, this.color.r + p.colorOffset));
+                    const g = Math.max(0, Math.min(255, this.color.g + p.colorOffset));
+                    const b = Math.max(0, Math.min(255, this.color.b + p.colorOffset));
+                    grad.addColorStop(0, `rgba(${r+50}, ${g+50}, ${b+50}, 0.9)`);
+                    grad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.8)`); 
+                    grad.addColorStop(1, `rgba(${r-40}, ${g-40}, ${b-40}, 0.9)`);
+                    ctx.fillStyle = grad;
+                    ctx.moveTo(0, 0);
+                    ctx.bezierCurveTo(-p.currentSize/2, -p.currentSize/2, -p.currentSize, -p.currentSize*1.5, 0, -p.currentSize*2);
+                    ctx.bezierCurveTo(p.currentSize, -p.currentSize*1.5, p.currentSize/2, -p.currentSize/2, 0, 0);
+                    ctx.fill(); ctx.restore();
+                });
+            }
+        }
+
+        class Polaroid {
+            constructor(x, y, contenido) {
+                this.x = x;
+                this.y = y;
+                this.contenido = contenido; 
+                this.size = 0;
+                this.targetSize = 150; 
+                this.alpha = 1;
+                this.rotation = (Math.random() - 0.5) * 0.4;
+                this.dy = -0.5 - Math.random(); 
+            }
+
+            draw() {
+                if (this.size >= this.targetSize) {
+                    this.alpha -= 0.008;
+                    if (this.alpha < 0) this.alpha = 0;
+                }
+                if (this.alpha <= 0) return;
+
+                if (this.size < this.targetSize) this.size += 10;
+                this.y += this.dy;
+
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.globalAlpha = this.alpha;
+
+                const border = 10;
+                const photoSize = this.size;
+                const cardWidth = photoSize + border * 2;
+                const cardHeight = photoSize + border * 2 + 25; 
+
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 20;
+                ctx.shadowOffsetY = 10;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
+                ctx.shadowColor = 'transparent'; 
+                try {
+                    if(this.contenido && this.contenido.elemento) {
+                         ctx.drawImage(this.contenido.elemento, -photoSize/2, -photoSize/2 - 10, photoSize, photoSize);
+                    }
+                } catch (e) {}
+
+                ctx.restore();
+            }
+        }
+
+        const chispas = Array.from({ length: 40 }, () => new Chispa());
+        const rosas = [];
+        const polaroids = []; 
+
+        function inicializarJardin() {
+            rosas.length = 0; 
+            const numRosas = 35;
+            for(let i=0; i<numRosas; i++) {
+                setTimeout(() => {
+                    const t = (Math.PI * 2 * i) / numRosas;
+                    const escala = Math.min(width, height) / 35; 
+                    const rX = 16 * Math.pow(Math.sin(t), 3);
+                    const rY = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+                    const x = (width / 2) + rX * escala;
+                    const y = (height / 2.2) - rY * escala; 
+                    const jitter = (Math.random() * 30) - 15;
+                    const color = colores[Math.floor(Math.random() * colores.length)];
+                    rosas.push(new RosaOrganica(x + jitter, y + jitter, color));
+                }, i * 50); 
+            }
+        }
+
+        inicializarJardin();
+
+        function animar() {
+            ctx.clearRect(0, 0, width, height);
+            chispas.forEach(c => { c.update(); c.draw(); });
+            rosas.forEach(r => r.draw());
+            polaroids.forEach((p, index) => {
+                p.draw();
+                if (p.alpha <= 0) polaroids.splice(index, 1);
+            });
+            requestAnimationFrame(animar);
+        }
+        animar();
+
+        let musicaIniciada = false;
+
+        function manejarInteraccion(e) {
+            if (!musicaIniciada) {
+                audio.play().then(() => {
+                    musicaIniciada = true;
+                    aviso.style.opacity = 0;
+                    if(video.paused) video.play().catch(e => {}); 
+                }).catch(err => console.log("Esperando click para audio"));
+            }
+
+            let clientX, clientY;
+            if(e.type === 'touchstart') {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            const color1 = colores[Math.floor(Math.random() * colores.length)];
+            rosas.push(new RosaOrganica(clientX, clientY, color1, true));
+
+            const contenido = obtenerContenidoSinRepetir();
+            if (contenido) {
+                polaroids.push(new Polaroid(clientX, clientY, contenido));
+            }
+        }
+
+        canvas.addEventListener('click', manejarInteraccion);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); 
+            manejarInteraccion(e);
+        }, {passive: false});
+
+    </script>
+</body>
+</html>
